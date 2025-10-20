@@ -39,10 +39,11 @@ def InitializeBot(bot: Botting) -> None:
     
 def TownRoutines(bot: Botting) -> None:
     bot.States.AddHeader("Town Routines")
-    bot.Map.Travel(target_map_id=650) #target_map_name="Longeyes Ledge")
+    bot.Map.Travel(target_map_id=675) #target_map_name="Boreal Station"
     InitializeBot(bot)
     bot.States.AddCustomState(lambda: EquipSkillBar(bot), "Equip SkillBar")
     HandleInventory(bot)
+    bot.Map.Travel(target_map_id=650) #target_map_name="Longeyes Ledge")
     bot.States.AddHeader("Exit to Bjora Marches")
     bot.Party.SetHardMode(True) #set hard mode on
     bot.Move.XYAndExitMap(-26375, 16180, target_map_id=482) # target_map_name="Bjora Marches")
@@ -202,8 +203,8 @@ def EquipSkillBar(bot: Botting):
 def HandleInventory(bot: Botting) -> None:
     bot.States.AddHeader("Inventory Handling")
     bot.Items.AutoIDAndSalvageAndDepositItems() #sort bags, auto id, salvage, deposit to bank
-    bot.Move.XYAndInteractNPC(-23110, 14942) # Merchant in Longeyes Ledge
-    bot.Wait.ForTime(500)
+    bot.Move.XYAndInteractNPC(7319, -24874, "Merchant_Boreal_Station") # Merchant in Boreal Station
+    bot.Wait.ForTime(1000)
     bot.Merchant.SellMaterialsToMerchant() # Sell materials to merchant, make space in inventory
     bot.Merchant.Restock.IdentifyKits() #restock identify kits
     bot.Merchant.Restock.SalvageKits() #restock salvage kits
