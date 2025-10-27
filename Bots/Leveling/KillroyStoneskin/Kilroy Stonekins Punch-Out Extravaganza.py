@@ -1,6 +1,6 @@
 from Py4GWCoreLib import Botting, get_texture_for_model, GLOBAL_CACHE, Routines, ActionQueueManager
 import PyImGui, Py4GW
-
+import os
 BOT_NAME = "Killroy Stoneskin"
 
 bot = Botting(BOT_NAME)
@@ -65,8 +65,7 @@ def _on_death(bot: "Botting"):
         max_energy = GLOBAL_CACHE.Agent.GetMaxEnergy(GLOBAL_CACHE.Player.GetAgentID())
         if max_energy >= 80: #we can go much higher but were dying too much, not worth the time
             bot.config.FSM.pause()
-            yield from bot.helpers.Map._travel(644)
-            yield from bot.helpers.Wait._for_map_load(644)
+            yield from bot.Map._coro_travel(644)
             bot.config.FSM.jump_to_state_by_name("[H]Killroy Stoneskin_1")
             bot.config.FSM.resume()
             yield from Routines.Yield.wait(1000)
@@ -107,9 +106,8 @@ def configure():
 def main():
     bot.Update()
     draw_window(bot)
-    projects_path = Py4GW.Console.get_projects_path()
-    full_path = projects_path + "\\Widgets\\Config\\textures\\"
-    bot.UI.draw_window(icon_path=full_path + "Killroy-Art.png")
+    path = os.path.join(Py4GW.Console.get_projects_path(),"Bots", "Leveling", "KillroyStoneskin","Kilroy Stonekins Punch-Out Extravaganza-art.png")
+    bot.UI.draw_window(icon_path=path)
 
 if __name__ == "__main__":
     main()
