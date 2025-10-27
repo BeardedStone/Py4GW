@@ -1,4 +1,4 @@
-from Py4GWCoreLib import Botting, Py4GW, Quest
+from Py4GWCoreLib import Botting, Py4GW, Quest, GLOBAL_CACHE, Routines
 
 bot = Botting("Turn In Rewards")
 
@@ -21,45 +21,13 @@ def get_user_settings():
     uv.setdefault("completed_mobstopper_cycles", 0)
     return uv
 
-
-def normalize_target_quantity(desired: int, previous: int | None = None) -> int:
-    if desired < 0:
-        return 0
-
-    remainder = desired % MOB_STOPPERS_PER_QUEST
-
-    if remainder == 0:
-        return desired
-
-    if previous is None:
-        return desired - remainder + (MOB_STOPPERS_PER_QUEST if remainder >= MOB_STOPPERS_PER_QUEST / 2 else 0)
-
-    if desired > previous:
-        return desired + (MOB_STOPPERS_PER_QUEST - remainder)
+def deposit_all_gold():
+    gold_on_char = GLOBAL_CACHE.Inventory.GetGoldOnCharacter()
+    if gold_on_char > 0:
+        GLOBAL_CACHE.Inventory.DepositGold(gold_on_char)
+        yield from Routines.Yield.wait(250)
     else:
-        return desired - remainder
-
-
-# ---------- Settings & UI ----------
-def draw_settings_ui():
-    import PyImGui
-    uv = get_user_settings()
-    PyImGui.text("Mobstopper Settings")
-
-    old_desired = int(uv.get("desired_mobstopper_quantity", 9))
-    desired = PyImGui.input_int("Desired Mobstoppers", old_desired)
-
-    normalized = normalize_target_quantity(desired, old_desired)
-    if normalized != old_desired:
-        uv["desired_mobstopper_quantity"] = normalized
-
-    PyImGui.text(f"Completed: {uv.get('completed_mobstopper_cycles', 0)}")
-    if PyImGui.button("Reset Completed"):
-        uv["completed_mobstopper_cycles"] = 0
-
-
-bot.UI.override_draw_config(lambda: draw_settings_ui())
-
+        yield
 
 def AddCheckQuotaStep(step_name="Check Quota"):
     def _check():
@@ -85,10 +53,14 @@ def create_bot_routine(bot: Botting) -> None:
     desired = int(uv.get("desired_mobstopper_quantity", 402))
 
     if done >= desired:
-        AddStopStep()
+        bot.States.AddHeader("Completed!")
+        bot.Stop()
+        return
 
     bot.States.AddHeader("Travel to Lion's Arch")
     bot.Map.Travel(target_map_id=808)
+    bot.States.AddHeader("Deposit Gold")
+    bot.States.AddCustomState(deposit_all_gold, "Deposit Gold")
     bot.States.AddHeader("Take Quest")
     bot.Move.XY(*STEWARD_POSITION, "Move to Steward")
     bot.Dialogs.WithModel(STEWARD_ID, DIALOG_QUEST_SELECT, "Talk to Steward")
@@ -101,7 +73,7 @@ def create_bot_routine(bot: Botting) -> None:
     bot.Map.LeaveGH()
 
     uv["completed_mobstopper_cycles"] = done + MOB_STOPPERS_PER_QUEST
-    bot.States.JumpToStepName("[H]Take Quest_3")
+    bot.States.JumpToStepName("[H]Deposit Gold_3")
 
     fsm = bot.config.FSM
     fsm.resume()
