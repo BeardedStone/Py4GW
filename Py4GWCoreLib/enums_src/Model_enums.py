@@ -19,6 +19,7 @@ class GadgetModelID(IntEnum):
     
     CHEST_DUNGEON_SECRET_LAIR_OF_THE_SNOWMAN = 9274 #ID for Secret Lair of the Snowman
     CHEST_DUNGEON_BOGROOT_GROWTHS = 8932 #ID for Bogroot Growths
+    CHEST_DUNGEON_SLAVERS_EXILE_JUSTICIAR_THOMMIS_ROOM = 9284 #ID for Slavers Exile (Justiciar Thommis room)
     
     
 class SpiritModelID(IntEnum):
@@ -684,9 +685,6 @@ class ModelID(IntEnum):
     Animal_Hide = 1236547896911  # Dummy modelid's to insure no LootManager Crash - will be changed to correct value
     Ashen_Wurm_Husk = 123654789692  # Dummy modelid's to insure no LootManager Crash - will be changed to correct value
     Bleached_Shell = 123654789693  # Dummy modelid's to insure no LootManager Crash - will be changed to correct value
-    Blood_Drinker_Pelt = (
-        123654789694  # Dummy modelid's to insure no LootManager Crash - will be changed to correct value
-    )
     Bonesnap_Shell = 123654789696  # Dummy modelid's to insure no LootManager Crash - will be changed to correct value
     Branch_Of_Juni_Berries = (
         123654789695  # Dummy modelid's to insure no LootManager Crash - will be changed to correct value
@@ -801,6 +799,7 @@ class ModelID(IntEnum):
     Bleached_Carapace = 449
     Blessing_Of_War = 37843
     Blob_Of_Ooze = 27067
+    Blood_Drinker_Pelt = 812
     Blue_Rock_Candy = 31151
     Bog_Skale_Fin = 443
     Bogroots_Boss_Key = 2593

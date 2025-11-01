@@ -1,6 +1,11 @@
 from typing import List, Tuple, Callable, Optional, Generator, Any
 
+from Py4GWCoreLib.enums_src.IO_enums import Key
+from Py4GWCoreLib.py4gwcorelib_src.Keystroke import Keystroke
+from Py4GWCoreLib.py4gwcorelib_src.Timer import Timer
 from Py4GWCoreLib.routines_src import Checks
+
+from PyAgent import AttributeClass
 from ..GlobalCache import GLOBAL_CACHE
 from ..Py4GWcorelib import ConsoleLog, Console, Utils, ActionQueueManager
 
@@ -301,6 +306,206 @@ class Yield:
 
 #region Skills
     class Skills:
+            
+        @staticmethod
+        def GenerateSkillbarTemplate() -> str:
+            """
+            Purpose: Generate template code for player's skillbar
+            Args: None
+            Returns: str: The current skillbar template.
+            """
+            
+            def encode_skill_template(prof_primary, prof_secondary, attributes, skills):
+                """Encode skill template data into template string"""
+                binary_data = ''
+
+                # Template type (4 bits) - 14 for skill template
+                binary_data += Utils.dec_to_bin64(14, 4)
+
+                # Version number (4 bits) - 0
+                binary_data += Utils.dec_to_bin64(0, 4)
+
+                # Determine profession bits needed
+                max_prof = max(prof_primary, prof_secondary)
+                if max_prof <= 15:  # 4 bits
+                    prof_bits_code = 0
+                    prof_bits = 4
+                elif max_prof <= 63:  # 6 bits
+                    prof_bits_code = 1
+                    prof_bits = 6
+                elif max_prof <= 255:  # 8 bits
+                    prof_bits_code = 2
+                    prof_bits = 8
+                else:  # 10 bits
+                    prof_bits_code = 3
+                    prof_bits = 10
+
+                # Profession bits code (2 bits)
+                binary_data += Utils.dec_to_bin64(prof_bits_code, 2)
+
+                # Primary profession
+                binary_data += Utils.dec_to_bin64(prof_primary, prof_bits)
+
+                # Secondary profession
+                binary_data += Utils.dec_to_bin64(prof_secondary, prof_bits)
+
+                # Attributes count (4 bits)
+                binary_data += Utils.dec_to_bin64(len(attributes), 4)
+
+                # Determine attribute bits needed
+                max_attr = max(attributes.keys()) if attributes else 0
+                if max_attr <= 15:  # 4 bits
+                    attr_bits_code = 0
+                    attr_bits = 4
+                elif max_attr <= 31:  # 5 bits
+                    attr_bits_code = 1
+                    attr_bits = 5
+                elif max_attr <= 63:  # 6 bits
+                    attr_bits_code = 2
+                    attr_bits = 6
+                elif max_attr <= 127:  # 7 bits
+                    attr_bits_code = 3
+                    attr_bits = 7
+                elif max_attr <= 255:  # 8 bits
+                    attr_bits_code = 4
+                    attr_bits = 8
+                else:  # More bits as needed
+                    attr_bits_code = min(15, max_attr.bit_length() - 4)
+                    attr_bits = attr_bits_code + 4
+
+                # Attribute bits code (4 bits)
+                binary_data += Utils.dec_to_bin64(attr_bits_code, 4)
+
+                # Attributes
+                for attr_id, attr_value in attributes.items():
+                    binary_data += Utils.dec_to_bin64(attr_id, attr_bits)
+                    binary_data += Utils.dec_to_bin64(attr_value, 4)
+
+                # Determine skill bits needed
+                max_skill = max(skills) if skills else 0
+                if max_skill <= 255:  # 8 bits
+                    skill_bits_code = 0
+                    skill_bits = 8
+                elif max_skill <= 511:  # 9 bits
+                    skill_bits_code = 1
+                    skill_bits = 9
+                elif max_skill <= 1023:  # 10 bits
+                    skill_bits_code = 2
+                    skill_bits = 10
+                elif max_skill <= 2047:  # 11 bits
+                    skill_bits_code = 3
+                    skill_bits = 11
+                elif max_skill <= 4095:  # 12 bits
+                    skill_bits_code = 4
+                    skill_bits = 12
+                else:  # More bits as needed
+                    skill_bits_code = min(15, max_skill.bit_length() - 8)
+                    skill_bits = skill_bits_code + 8
+
+                # Skill bits code (4 bits)
+                binary_data += Utils.dec_to_bin64(skill_bits_code, 4)
+
+                # Skills (8 skills)
+                for skill in skills:
+                    binary_data += Utils.dec_to_bin64(skill, skill_bits)
+
+                # Tail (1 bit) - always 0
+                binary_data += '0'
+
+                # Convert binary to base64
+                return Utils.bin64_to_base64(binary_data)
+
+            try:
+                # Get skill IDs for all 8 slots
+                skills = []
+                for slot in range(1, 9):  # Slots 1-8
+                    skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot)
+                    skills.append(skill_id if skill_id else 0)
+
+                # Get profession IDs
+                prof_primary, prof_secondary = GLOBAL_CACHE.Agent.GetProfessionIDs(GLOBAL_CACHE.Player.GetAgentID())
+
+                # Get attributes
+                attributes_raw:list[AttributeClass] = GLOBAL_CACHE.Agent.GetAttributes(GLOBAL_CACHE.Player.GetAgentID())
+                attributes = {}
+
+                # Convert attributes to dictionary format
+                for attr in attributes_raw:
+                    attr_id = int(attr.attribute_id)  # Convert enum to integer
+                    attr_level = attr.level_base  # Get attribute level
+                    if attr_level > 0:  # Only include attributes with points
+                        attributes[attr_id] = attr_level
+
+                # Encode template
+                template = encode_skill_template(prof_primary, prof_secondary, attributes, skills)
+                return template
+
+            except Exception as e:
+                # Return empty string if encoding fails
+                print(f"Failed to encode skillbar template: {e}")
+                return ""
+
+        @staticmethod
+        def ParseSkillbarTemplate(template:str) -> tuple[int, int, dict, list]:
+            '''
+            Purpose: Parse a skillbar template into its components.
+            Args:
+                template (str): The skillbar template to parse.
+            Returns:
+                prof_primary (int): The primary profession ID.
+                prof_secondary (int): The secondary profession ID.
+                attributes (dict): A dictionary of attribute IDs and levels.
+                skills (list): A list of skill IDs.
+            '''
+
+            
+            enc_template = ''
+
+            for char in template:
+                enc_template = f'{enc_template}{Utils.base64_to_bin64(char)}'
+        
+            template_type = Utils.bin64_to_dec(enc_template[:4])
+            # if template_type != 14:
+            #     return (None, None, None, None)
+            enc_template = enc_template[4:]
+
+            version_number = Utils.bin64_to_dec(enc_template[:4])
+            enc_template = enc_template[4:]
+
+            prof_bits = Utils.bin64_to_dec(enc_template[:2]) * 2 + 4
+            enc_template = enc_template[2:]
+
+            prof_primary = Utils.bin64_to_dec(enc_template[:prof_bits])
+            enc_template = enc_template[prof_bits:]
+
+            prof_secondary = Utils.bin64_to_dec(enc_template[:prof_bits])
+            enc_template = enc_template[prof_bits:]
+
+            attributes_count = Utils.bin64_to_dec(enc_template[:4])
+            enc_template = enc_template[4:]
+
+            attributes_bits = Utils.bin64_to_dec(enc_template[:4]) + 4
+            enc_template = enc_template[4:]
+            
+            attributes = {}
+            for i in range(attributes_count):
+                attr = Utils.bin64_to_dec(enc_template[:attributes_bits])
+                enc_template = enc_template[attributes_bits:]
+                value = Utils.bin64_to_dec(enc_template[:4])
+                enc_template = enc_template[4:]
+                attributes[attr] = value
+            
+            skill_bits = Utils.bin64_to_dec(enc_template[:4]) + 8
+            enc_template = enc_template[4:]
+
+            skills = []
+            for i in range(8):
+                skill = Utils.bin64_to_dec(enc_template[:skill_bits])
+                enc_template = enc_template[skill_bits:]
+                skills.append(skill)
+
+            return (prof_primary, prof_secondary, attributes, skills)
+
         @staticmethod
         def LoadSkillbar(skill_template:str, log=False):
             """
@@ -1157,7 +1362,6 @@ class Yield:
                 
                 free_slots_in_inventory = GLOBAL_CACHE.Inventory.GetFreeSlotCount()
                 if free_slots_in_inventory <= 0:
-                    ConsoleLog("LootItems", "No free slots in inventory, stopping loot.", Console.MessageType.Warning)
                     item_array.clear()
                     ActionQueueManager().ResetAllQueues()
                     return False
@@ -1173,7 +1377,6 @@ class Yield:
                 item_x, item_y = GLOBAL_CACHE.Agent.GetXY(item_id)
                 item_reached = yield from Yield.Movement.FollowPath([(item_x, item_y)], timeout=pickup_timeout)
                 if not item_reached:
-                    ConsoleLog("LootItems", "Failed to reach item, stopping loot.", Console.MessageType.Warning)
                     item_array.clear()
                     ActionQueueManager().ResetAllQueues()
                     return False
@@ -1189,13 +1392,10 @@ class Yield:
                         live_items  = AgentArray.GetItemArray()
                         if item_id not in live_items :
                             break
-
                     
                 if progress_callback and total_items > 0:
                     progress_callback(1 - len(item_array) / total_items)
-            if log and len(item_array) > 0:
-                ConsoleLog("LootItems", f"Looted {len(item_array)} items.", Console.MessageType.Info)
-                
+                        
             return True
 
         @staticmethod
@@ -1961,3 +2161,91 @@ class Yield:
             if slot < 1 or slot > 8:
                 return
             yield from Yield.Keybinds.PressKeybind(ControlAction.ControlAction_UseSkill1.value + (slot - 1), 125)
+
+#region Character Reroll
+    class RerollCharacter:
+        @staticmethod
+        def Reroll(target_character_name: str, timeout_ms: int = 10000, log: bool = False) -> Generator[Any, Any, None]:            
+            ActionQueueManager().ResetAllQueues()
+            
+            timer = Timer()
+            timer.Start()
+            
+            def _timeout_reached() -> bool:
+                return timer.GetElapsedTime() >= timeout_ms
+            
+            def _is_char_select_context_ready() -> bool:
+                """Checks if character select is active and context is available."""
+                if not GLOBAL_CACHE.Player.InCharacterSelectScreen():
+                    return False
+                pregame = GLOBAL_CACHE.Player.GetPreGameContext()
+                return pregame is not None and pregame.chars is not None
+            
+            def _failed() -> bool:
+                return _timeout_reached() or not _is_char_select_context_ready()
+            
+            character_names = [char.player_name for char in GLOBAL_CACHE.Player.GetLoginCharacters()]
+            
+            if target_character_name not in character_names:
+                ConsoleLog("Reroll", f"Character '{target_character_name}' not found among login characters.", Console.MessageType.Error)
+                return
+            
+            if GLOBAL_CACHE.Player.GetName() == target_character_name and not GLOBAL_CACHE.Player.InCharacterSelectScreen():
+                ConsoleLog("Reroll", f"Already logged in as '{target_character_name}'. No reroll needed.", Console.MessageType.Info)
+                return
+            
+            if not GLOBAL_CACHE.Player.InCharacterSelectScreen():
+                ConsoleLog("Reroll", "Logging out to character select screen.", Console.MessageType.Info)
+                GLOBAL_CACHE.Player.LogoutToCharacterSelect()                        
+                        
+        
+            # Wait until we reach character select screen
+            while not _is_char_select_context_ready() and not _timeout_reached():
+                yield from Yield.wait(250)
+                
+            if _failed():
+                if _timeout_reached():
+                    ConsoleLog("Reroll", "Timeout reached while waiting for character select screen.", Console.MessageType.Error)
+                return
+                        
+            pregame = GLOBAL_CACHE.Player.GetPreGameContext()
+            character_index = pregame.chars.index(target_character_name) if target_character_name in pregame.chars else -1
+            last_known_index = pregame.index_1
+            
+            if character_index == -1:
+                ConsoleLog("Reroll", f"Character '{target_character_name}' not found in character list.", Console.MessageType.Error)
+                return
+                
+            while last_known_index != character_index and not _failed():    
+                distance = character_index - last_known_index
+                
+                if distance != 0:
+                    key = Key.RightArrow.value if distance > 0 else Key.LeftArrow.value
+                    ConsoleLog("Reroll", f"Navigating {'Right' if distance > 0 else 'Left'} (Current: {last_known_index}, Target: {character_index})", Console.MessageType.Debug, log)
+                    Keystroke.PressAndRelease(key)
+                    yield from Yield.wait(50)
+                    pregame = GLOBAL_CACHE.Player.GetPreGameContext()
+                    last_known_index = pregame.index_1
+
+            if _failed():
+                if _timeout_reached():
+                    ConsoleLog("Reroll", "Timeout reached while navigating to target character.", Console.MessageType.Error)
+                    
+                elif not _is_char_select_context_ready():
+                    ConsoleLog("Reroll", "Character select context lost while navigating to target character.", Console.MessageType.Error)
+
+                return
+
+            ConsoleLog("Reroll", f"Selecting character '{target_character_name}'.", Console.MessageType.Info)
+            Keystroke.PressAndRelease(Key.P.value)
+            yield from Yield.wait(50)
+            
+            while not GLOBAL_CACHE.Map.IsMapReady() and not _timeout_reached():
+                yield from Yield.wait(250)
+                
+            if _timeout_reached():
+                ConsoleLog("Reroll", "Timeout reached while waiting for map to load.", Console.MessageType.Error)
+                return
+                
+            ConsoleLog("Reroll", f"Successfully logged in as '{target_character_name}'.", Console.MessageType.Info)
+            return                    
